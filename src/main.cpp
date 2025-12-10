@@ -15,6 +15,15 @@ static volatile bool enc_pressed = false;
 static volatile int enc_delta = 0;
 static volatile uint8_t prev_state = 0;
 
+// ---------------- Dial globals -------------------
+static int dial_value = 50;       // Start in the middle
+static lv_obj_t *dial_arc = NULL; // The widget
+
+static inline int clamp_int(int v, int lo, int hi)
+{
+    return (v < lo) ? lo : (v > hi) ? hi : v;
+}
+
 void IRAM_ATTR enc_isr() {
     uint8_t a = digitalRead(6);
     uint8_t b = digitalRead(7);
@@ -56,6 +65,7 @@ void my_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *color_p)
 
     lv_display_flush_ready(disp);
 }
+
 
 // ---------------- Setup ----------------
 void setup()
@@ -112,12 +122,15 @@ void setup()
     }
 
     // LVGL9: associate frame buffer
+    static uint16_t buf1[240 * 40];    // 40-line strip
+    static uint16_t buf2[240 * 40];    // second buffer (double-buffered)
+
     lv_display_set_buffers(
         disp,
-        lv_framebuf,
-        NULL,  // Single buffer (direct mode)
-        240 * 240 * 2,
-        LV_DISPLAY_RENDER_MODE_DIRECT
+        buf1,
+        buf2,
+        sizeof(buf1),
+        LV_DISPLAY_RENDER_MODE_PARTIAL
     );
     Serial.println("Display buffers set.");
 
@@ -142,6 +155,31 @@ void setup()
     lv_obj_invalidate(lv_screen_active());  // Mark screen dirty
     lv_timer_handler();  // Run once in setup for initial flush
     Serial.println("Initial render triggered.");
+
+    // ---------------- Create Rotary Dial ----------------
+    dial_arc = lv_arc_create(lv_screen_active());
+
+    // Arc range and starting value
+    lv_arc_set_range(dial_arc, 0, 100);
+    lv_arc_set_value(dial_arc, dial_value);
+
+    // Remove draggable behavior (we control it via encoder)
+    lv_obj_clear_flag(dial_arc, LV_OBJ_FLAG_CLICKABLE);
+
+    // Resize + center arc
+    lv_obj_set_size(dial_arc, 180, 180);
+    lv_obj_center(dial_arc);
+
+    // Style
+    lv_obj_set_style_arc_width(dial_arc, 20, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_width(dial_arc, 20, LV_PART_MAIN);
+
+    lv_obj_set_style_arc_color(dial_arc, lv_color_hex(0x007BFF), LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(dial_arc, lv_color_hex(0x444444), LV_PART_MAIN);
+
+    // Optional: turn off rotation animation
+    lv_arc_set_bg_angles(dial_arc, 135, 45); // 270° sweep like a volume knob
+
 }
 
 void loop()
@@ -176,5 +214,19 @@ void loop()
                       enc_pressed ? "PRESSED" : "RELEASED");
         last_btn = enc_pressed;
     }
+
+    // ---------------- Rotary Dial Update ----------------
+    int delta = enc_delta;
+    if (delta != 0) {
+        enc_delta = 0;
+
+        dial_value += delta;  // +1 or -1 per detent
+        dial_value = clamp_int(dial_value, 0, 100);
+
+        lv_arc_set_value(dial_arc, dial_value);
+
+        Serial.printf("Dial value: %d\n", dial_value);
+    }
+
 }
 
