@@ -76,6 +76,8 @@ void IRAM_ATTR enc_btn_isr() {
 // ---------------- LVGL Objects ----------------
 lv_obj_t* dial_arc;
 lv_obj_t* dial_label;
+lv_obj_t* dial_function;
+
 
 // ---------------- Dial Update Helper ----------------
 static inline void dial_set_value(int v) {
@@ -116,6 +118,12 @@ void create_dial()
     lv_obj_center(dial_label);
     lv_obj_set_style_text_font(dial_label, &lv_font_montserrat_48, 0);
     lv_label_set_text_fmt(dial_label, "%d", dial_value);
+
+    // Function label
+    dial_function = lv_label_create(lv_scr_act());
+    lv_obj_set_style_text_font(dial_function, &lv_font_montserrat_20, 0);
+    lv_obj_align(dial_function, LV_ALIGN_BOTTOM_MID, 0, -35);
+    lv_label_set_text(dial_function, "MASTER\nVOLUME");
 
     // Set initial conditions
     lv_arc_set_value(dial_arc, dial_value);
