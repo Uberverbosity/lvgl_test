@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include "pages/master_dial.h"
 
 // TFT / LVGL order matters!
 #include <TFT_eSPI.h>
@@ -32,8 +33,6 @@ static const int8_t transition_table[4][4] = {
     { -1,  0,  0, +1 },
     {  0, +1, -1,  0 }
 };
-
-int dial_value = 50;  // start mid-scale
 
 void my_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *color_p)
 {
@@ -70,64 +69,6 @@ void IRAM_ATTR enc_isr() {
 
 void IRAM_ATTR enc_btn_isr() {
     enc_pressed = !digitalRead(PIN_ENC_BTN);   // active low
-}
-
-
-// ---------------- LVGL Objects ----------------
-lv_obj_t* dial_arc;
-lv_obj_t* dial_label;
-lv_obj_t* dial_function;
-
-
-// ---------------- Dial Update Helper ----------------
-static inline void dial_set_value(int v) {
-    dial_value = v;
-    lv_arc_set_value(dial_arc, v);
-
-    char buf[8];
-    snprintf(buf, sizeof(buf), "%d", v);
-    lv_label_set_text(dial_label, buf);
-}
-
-void create_dial()
-{
-    dial_arc = lv_arc_create(lv_scr_act());
-    lv_obj_set_size(dial_arc, 220, 220);
-    lv_obj_center(dial_arc);
-
-    // Remove knob and square the indicator
-    lv_obj_remove_style(dial_arc, NULL, LV_PART_KNOB);
-    lv_obj_set_style_arc_rounded(dial_arc, false, LV_PART_MAIN);
-    lv_obj_set_style_arc_rounded(dial_arc, false, LV_PART_INDICATOR);
-
-    // Thick arc, near outer edge
-    lv_obj_set_style_arc_width(dial_arc, 24, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(dial_arc, 24, LV_PART_INDICATOR);
-
-    // 270° sweep (from ~7 o'clock to 5 o'clock)
-    lv_arc_set_bg_start_angle(dial_arc, 145);
-    lv_arc_set_bg_end_angle(dial_arc, 35);
-    lv_arc_set_start_angle(dial_arc, 145);
-    lv_arc_set_end_angle(dial_arc,35);
-
-    lv_obj_set_style_arc_color(dial_arc, lv_color_hex(0xCCCCCC), LV_PART_MAIN);
-    lv_obj_set_style_arc_color(dial_arc, lv_color_hex(0x44CC44), LV_PART_INDICATOR);
-
-    // Center number label
-    dial_label = lv_label_create(lv_scr_act());
-    lv_obj_center(dial_label);
-    lv_obj_set_style_text_font(dial_label, &lv_font_montserrat_48, 0);
-    lv_label_set_text_fmt(dial_label, "%d", dial_value);
-
-    // Function label
-    dial_function = lv_label_create(lv_scr_act());
-    lv_obj_set_style_text_font(dial_function, &lv_font_montserrat_20, 0);
-    lv_obj_align(dial_function, LV_ALIGN_BOTTOM_MID, 0, -35);
-    lv_label_set_text(dial_function, "MASTER\nVOLUME");
-
-    // Set initial conditions
-    lv_arc_set_value(dial_arc, dial_value);
-    lv_label_set_text_fmt(dial_label, "%d", dial_value);
 }
 
 // ---------------- Setup ----------------
@@ -169,7 +110,7 @@ void setup() {
 
     lv_display_set_flush_cb(disp, my_flush_cb);
 
-    create_dial();
+    master_dial_create(lv_scr_act());
 
     Serial.println("Setup complete.");
 }
@@ -191,15 +132,7 @@ void loop()
     enc_delta = 0;
 
     if (delta != 0) {
-        int new_val = dial_value + (delta > 0 ? +1 : -1);
-
-        // Clamp 0–100
-        if (new_val < 0)  new_val = 0;
-        if (new_val > 100) new_val = 100;
-
-        dial_set_value(new_val);
-
-        Serial.printf("Dial: %d\n", new_val);
+        master_dial_set_value(delta);
     }
 
 
