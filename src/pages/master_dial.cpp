@@ -2,6 +2,7 @@
 #include "master_dial.h"
 #include <lvgl.h>
 #include <cstdio>
+#include "protocol/helix_protocol.h"
 
 // ---------------- Internal State (private to this file) ----------------
 static lv_obj_t* dial_arc;
@@ -67,14 +68,16 @@ void master_dial_create(lv_obj_t* parent)
 
 void master_dial_set_value(int delta)
 {
+    // UI optimism: move visually immediately
     dial_value += delta;
- 
-    if(dial_value < 0)  dial_value = 0;
-    if(dial_value > 100) dial_value = 100;
+    if (dial_value < 0)   dial_value = 0;
+    if (dial_value > 100) dial_value = 100;
 
- 
     lv_arc_set_value(dial_arc, dial_value);
     dial_update_label(dial_value);
+
+    // Protocol intent
+    helix_volume_delta(delta);
 
     Serial.printf("Master Dial: %d\n", dial_value);
 

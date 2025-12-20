@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "pages/master_dial.h"
+#include "protocol/helix_protocol.h"
 
 // TFT / LVGL order matters!
 #include <TFT_eSPI.h>
@@ -19,6 +20,8 @@ void my_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *color_p);
 #define PIN_ENC_A   6
 #define PIN_ENC_B   7
 #define PIN_ENC_BTN 9
+#define DSP_RX_PIN 20   // ESP receives from DSP (red wire → RX1)
+#define DSP_TX_PIN 21   // ESP transmits to DSP (white wire → TX1)
 
 
 // ---------------- Encoder Globals ----------------
@@ -75,8 +78,7 @@ void IRAM_ATTR enc_btn_isr() {
 void setup() {
     Serial.begin(115200);
     delay(300);
-    Serial.println("Booting clean test build...");
-
+    
     // -------- GPIO Setup --------
     pinMode(PIN_BL, OUTPUT);
     digitalWrite(PIN_BL, LOW);   // Backlight ON
@@ -113,11 +115,21 @@ void setup() {
     master_dial_create(lv_scr_act());
 
     Serial.println("Setup complete.");
+    Serial1.begin(
+    230400,
+    SERIAL_8N1,
+    DSP_RX_PIN,
+    DSP_TX_PIN
+    );
+    helix_begin(Serial1);
+
 }
 
 // -------------------- Loop --------------------
 void loop()
 {
+    helix_loop();
+
     // -------- LVGL Tick --------
     static uint32_t last = 0;
     uint32_t now = millis();
@@ -126,15 +138,15 @@ void loop()
 
     lv_timer_handler();   // let LVGL render
 
-
     // -------- Encoder Detents --------
+    noInterrupts();
     int delta = enc_delta;
     enc_delta = 0;
+    interrupts();
 
     if (delta != 0) {
         master_dial_set_value(delta);
     }
-
 
     // -------- Encoder Button --------
     static bool last_btn = false;
